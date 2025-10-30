@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 import os
 from glob import glob
 
-package_name = 'ros2_basic_agent'
+package_name = 'ros2_ai_agent'
 
 setup(
     name=package_name,

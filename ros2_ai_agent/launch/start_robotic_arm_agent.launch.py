@@ -1,4 +1,6 @@
 from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch.actions import IncludeLaunchDescription, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
@@ -12,16 +14,32 @@ def generate_launch_description():
         PythonLaunchDescriptionSource([ur_launch_file_dir, '/ur_sim_moveit.launch.py'])
     )
 
-    DeclareLaunchArgument(
+    # Declare launch arguments
+    llm_api_arg = DeclareLaunchArgument(
         "llm_api",
         default_value="ollama",
         description="Which API to use for LLM (openai, ollama)."
-    ),     
-    DeclareLaunchArgument(
+    )    
+    llm_model_arg = DeclareLaunchArgument(
         "llm_model",
         default_value="gpt-oss:20b",
         description="Name of LLM format={model}:{variant} default=gpt-oss:20b"
-    ),
+    )
+    use_basic_tools_arg = DeclareLaunchArgument(
+        "use_basic_tools",
+        default_value="True",
+        description="Include basic tools (get_ros_distro, get_domain_id)."
+    )
+    use_generic_tools_arg = DeclareLaunchArgument(
+        "use_generic_tools",
+        default_value="True",
+        description="Include generic ROS2 tools (list_topics, list_nodes, list_services, list_actions)."
+    )
+    use_robot_tools_arg = DeclareLaunchArgument(
+        "use_robot_tools",
+        default_value="True",
+        description="Include robot-specific tools (move_to_pose, get_current_pose, move_to_named_target."
+    )
 
     # Define the AI agent node with a delay
     delayed_agent = TimerAction(
@@ -33,7 +51,10 @@ def generate_launch_description():
                 name='ros2_ai_agent_robotic_arm',
                 parameters=[
                    {"llm_api":LaunchConfiguration("llm_api")},
-                   {"llm_model":LaunchConfiguration("llm_model")}
+                   {"llm_model":LaunchConfiguration("llm_model")},
+                   {"use_basic_tools":PythonExpression(['"', LaunchConfiguration('use_basic_tools'), '" == "True"'])},
+                   {"use_generic_tools":PythonExpression(['"', LaunchConfiguration('use_generic_tools'), '" == "True"'])},
+                   {"use_robot_tools":PythonExpression(['"', LaunchConfiguration('use_robot_tools'), '" == "True"'])}
                 ],
                 output='screen',
                 emulate_tty=True,
@@ -42,6 +63,8 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        llm_api_arg, llm_model_arg,
+        use_basic_tools_arg, use_generic_tools_arg, use_robot_tools_arg,
         ur_moveit_launch,
         delayed_agent
     ])

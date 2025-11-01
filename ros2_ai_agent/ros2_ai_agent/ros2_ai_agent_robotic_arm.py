@@ -22,6 +22,7 @@ from shape_msgs.msg import SolidPrimitive
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion, Vector3
 from langchain.agents import AgentExecutor, create_openai_tools_agent
 from langchain_openai import ChatOpenAI
+from langchain_ollama import ChatOllama
 from langchain.tools import tool
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from dotenv import load_dotenv
@@ -34,6 +35,28 @@ class ROS2AIAgent(Node):
         super().__init__('ros2_ai_agent')
         self.get_logger().info('ROS2 AI Agent for UR MoveIt2 has been started')
 
+        # LLM parameters        
+        self.declare_parameter("llm_api", "ollama")
+        self.llm_api = self.get_parameter("llm_api").value
+        self.get_logger().info('llm_api : "%s"' % self.llm_api)
+        #
+        self.declare_parameter("llm_model", "gpt-oss:20b")
+        self.llm_model = self.get_parameter("llm_model").value
+        self.get_logger().info('llm_model : "%s"' % self.llm_model)
+
+        # Tools parameters
+        self.declare_parameter("use_basic_tools", True)
+        self.use_basic_tools = self.get_parameter("use_basic_tools").value
+        self.get_logger().info('use_basic_tools : "%s"' % self.use_basic_tools)
+        #        
+        self.declare_parameter("use_generic_tools", True)
+        self.use_generic_tools = self.get_parameter("use_generic_tools").value
+        self.get_logger().info('use_generic_tools : "%s"' % self.use_generic_tools)
+        #
+        self.declare_parameter("use_robot_tools", True)
+        self.use_robot_tools = self.get_parameter("use_robot_tools").value
+        self.get_logger().info('use_robot_tools : "%s"' % self.use_robot_tools)
+       
         # Create action client
         self.move_action = ActionClient(self, MoveGroup, 'move_action')
         
@@ -46,6 +69,68 @@ class ROS2AIAgent(Node):
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
+        @tool
+        def get_ros_distro() -> str:
+            """Get the current ROS distribution name."""
+            try:
+                ros_distro = os.environ.get('ROS_DISTRO')
+                if (ros_distro):
+                    return f"Current ROS distribution: {ros_distro}"
+                else:
+                    return "ROS distribution environment variable (ROS_DISTRO) not set"
+            except Exception as e:
+                return f"Error getting ROS distribution: {str(e)}"
+
+        @tool
+        def get_domain_id() -> str:
+            """Get the current ROS domain ID."""
+            try:
+                domain_id = os.environ.get('ROS_DOMAIN_ID', '0')  # Default is 0 if not set
+                return f"Current ROS domain ID: {domain_id}"
+            except Exception as e:
+                return f"Error getting ROS domain ID: {str(e)}"
+
+        @tool
+        def list_topics() -> str:
+            """List all available ROS 2 topics."""
+            try:
+                result = subprocess.run(['ros2', 'topic', 'list'], 
+                                 capture_output=True, text=True, check=True)
+                topics = result.stdout.strip().split('\n')
+                return f"Available ROS 2 topics:\n{result.stdout}"
+            except subprocess.CalledProcessError as e:
+                return f"Error listing topics: {str(e)}"
+
+        @tool
+        def list_nodes() -> str:
+            """List all running ROS 2 nodes."""
+            try:
+                result = subprocess.run(['ros2', 'node', 'list'], 
+                                 capture_output=True, text=True, check=True)
+                return f"Running ROS 2 nodes:\n{result.stdout}"
+            except subprocess.CalledProcessError as e:
+                return f"Error listing nodes: {str(e)}"
+
+        @tool
+        def list_services() -> str:
+            """List all available ROS 2 services."""
+            try:
+                result = subprocess.run(['ros2', 'service', 'list'], 
+                                 capture_output=True, text=True, check=True)
+                return f"Available ROS 2 services:\n{result.stdout}"
+            except subprocess.CalledProcessError as e:
+                return f"Error listing services: {str(e)}"
+
+        @tool
+        def list_actions() -> str:
+            """List all available ROS 2 actions."""
+            try:
+                result = subprocess.run(['ros2', 'action', 'list'], 
+                                 capture_output=True, text=True, check=True)
+                return f"Available ROS 2 actions:\n{result.stdout}"
+            except subprocess.CalledProcessError as e:
+                return f"Error listing actions: {str(e)}"
+
         # Create tools
         self.move_to_pose_tool = tool(self.move_to_pose)
         self.get_current_pose_tool = tool(self.get_current_pose)
@@ -57,19 +142,65 @@ class ROS2AIAgent(Node):
             'up': [0.0, -2.0, 0.0, -1.57, 0.0, 0.0]      # Up position
         }
 
-        self.prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are a UR robot control assistant using MoveIt 2.
+        if self.use_basic_tools == True:
+            basic_tools_prompt1 = """
+            You can check ROS 2 system status using these commands:
+            - get_ros_distro(): Get the current ROS distribution name
+            - get_domain_id(): Get the current ROS_DOMAIN_ID
+            """    
+            basic_tools_prompt2 = """
+            Human: What ROS distribution am I using?
+            AI: Current ROS distribution: humble
+            Human: What is my ROS domain ID?
+            AI: Current ROS domain ID: 0
+            Human: Show me all running nodes
+            """
+        else:
+            basic_tools_prompt1 = ""
+            basic_tools_prompt2 = ""
+
+        if self.use_generic_tools == True:
+            generic_tools_prompt1 = """
+            You can check ROS 2 system status using these commands:
+            - get_ros_distro(): Get the current ROS distribution name
+            - get_domain_id(): Get the current ROS_DOMAIN_ID
+            """    
+            generic_tools_prompt2 = """
+            Human: Show me all running nodes
+            AI: Here are the running ROS 2 nodes: [node list]
+            """
+        else:
+            generic_tools_prompt1 = ""
+            generic_tools_prompt2 = ""
+
+        if self.use_robot_tools == True:
+            robot_tools_prompt1 = """
             You can control the robot using these commands:
             - move_to_pose(x, y, z): Move end effector to specified x,y,z coordinates
             - get_current_pose(): Get current position of the end effector
             - move_to_named_target(target_name): Move to predefined position (home, up)
-            
-            Return only the necessary actions and their results. e.g
+            """    
+            robot_tools_prompt2 = """
             Human: Move the end effector to position x=0.5, y=0.0, z=0.5
             AI: Moving end effector to position x: 0.5, y: 0.0, z: 0.5
             Human: Move robot to home position
             AI: Moving robot to home position
-            """),
+            """
+        else:
+            robot_tools_prompt1 = ""
+            robot_tools_prompt2 = ""
+
+        system_prompt = """
+            You are a UR robot control assistant using MoveIt 2.
+            """ + basic_tools_prompt1 + generic_tools_prompt1 + robot_tools_prompt1 + """
+            
+            Return only the necessary actions and their results. e.g
+            """ + basic_tools_prompt2 + generic_tools_prompt2 + robot_tools_prompt2 + """
+            """ 
+        self.get_logger().info('system_prompt : "%s"' % system_prompt)
+
+        self.prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
             MessagesPlaceholder("chat_history", optional=True),
             ("human", "{input}"),
             MessagesPlaceholder("agent_scratchpad"),
@@ -82,17 +213,29 @@ class ROS2AIAgent(Node):
 
         # Setup toolkit
         self.toolkit = [
+            get_ros_distro, get_domain_id,
+            list_topics, list_nodes, list_services, list_actions,
             self.move_to_pose_tool, 
             self.get_current_pose_tool,
             self.move_to_named_target_tool
         ]
 
-        # Initialize LLM and agent
-        self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        # Choose the LLM that will drive the agent
+        
+        if self.llm_api == "openai":
+            self.llm = ChatOpenAI(model=self.llm_model, temperature=0)
+        elif self.llm_api == "ollama":
+            self.llm = ChatOllama( model=self.llm_model, temperature=0 )
+        else:
+            self.get_logger().error(f'Invalid llm_api: {self.llm_api}')
+
+        # Construct the AI Tools agent
         self.agent = create_openai_tools_agent(self.llm, self.toolkit, self.prompt)
+
+        # Create an agent executor by passing in the agent and tools
         self.agent_executor = AgentExecutor(agent=self.agent, tools=self.toolkit, verbose=True)
 
-        # Create prompt subscriber
+        # Create the subscriber for prompts
         self.subscription = self.create_subscription(
             String,
             'prompt',

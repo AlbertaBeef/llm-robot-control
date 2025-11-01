@@ -11,23 +11,22 @@ Acknowledgements:
 Classes:
     ROS2AIAgent(Node): A ROS2 node that subscribes to a topic and uses an AI agent to control the turtle.
 
-Key Methods:
-    - prompt_callback(msg: String): Handles incoming messages and processes them using the AI agent.
+Functions:
+    General (ROS2 specific) Tools:
     - get_ros_distro() -> str: Retrieves the current ROS distribution name.
     - get_domain_id() -> str: Retrieves the current ROS domain ID.
-Methods:
-    prompt_callback(msg: String): Callback function to process incoming messages.
-    list_topics() -> str: Lists all available ROS 2 topics.
-    list_nodes() -> str: Lists all running ROS 2 nodes.
-    list_services() -> str: Lists all available ROS 2 services.
-    list_actions() -> str: Lists all available ROS 2 actions.
-Functions:
-    move_forward(distance: float) -> str: Moves the turtle forward by the specified distance.
-    rotate(angle: float) -> str: Rotates the turtle by the specified angle in degrees.
-    get_pose() -> str: Gets the current position and orientation of the turtle.
-    pose_callback(msg: Pose): Callback function to update the turtle's pose.
-    prompt_callback(msg: String): Callback function to process incoming messages.
-    main(args=None): Initializes and spins the ROS2 node.
+    - list_topics() -> str: Lists all available ROS 2 topics.
+    - list_nodes() -> str: Lists all running ROS 2 nodes.
+    - list_services() -> str: Lists all available ROS 2 services.
+    - list_actions() -> str: Lists all available ROS 2 actions.
+    Robot specific Tools:
+    - move_forward(distance: float) -> str: Moves the turtle forward by the specified distance.
+    - rotate(angle: float) -> str: Rotates the turtle by the specified angle in degrees.
+    - get_pose() -> str: Gets the current position and orientation of the turtle.
+    Other functions:
+    - pose_callback(msg: Pose): Callback function to update the turtle's pose.
+    - prompt_callback(msg: String): Callback function to process incoming messages.
+    - main(args=None): Initializes and spins the ROS2 node.
 
 Dependencies:
     - os
@@ -80,6 +79,19 @@ class ROS2AIAgent(Node):
         self.declare_parameter("llm_model", "gpt-oss:20b")
         self.llm_model = self.get_parameter("llm_model").value
         self.get_logger().info('llm_model : "%s"' % self.llm_model)
+
+        # Tools parameters
+        self.declare_parameter("use_basic_tools", True)
+        self.use_basic_tools = self.get_parameter("use_basic_tools").value
+        self.get_logger().info('use_basic_tools : "%s"' % self.use_basic_tools)
+        #        
+        self.declare_parameter("use_generic_tools", True)
+        self.use_generic_tools = self.get_parameter("use_generic_tools").value
+        self.get_logger().info('use_generic_tools : "%s"' % self.use_generic_tools)
+        #
+        self.declare_parameter("use_robot_tools", True)
+        self.use_robot_tools = self.get_parameter("use_robot_tools").value
+        self.get_logger().info('use_robot_tools : "%s"' % self.use_robot_tools)
         
         # Initialize turtle pose
         self.turtle_pose = Pose()
@@ -188,70 +200,81 @@ class ROS2AIAgent(Node):
             """Get current pose of the turtle."""
             return f"x: {self.turtle_pose.x:.2f}, y: {self.turtle_pose.y:.2f}, theta: {math.degrees(self.turtle_pose.theta):.2f} degrees"
 
-        self.prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are a turtle control assistant for ROS 2 turtlesim.
+        if self.use_basic_tools == True:
+            basic_tools_prompt1 = """
             You can check ROS 2 system status using these commands:
             - get_ros_distro(): Get the current ROS distribution name
             - get_domain_id(): Get the current ROS_DOMAIN_ID
-            You can check ROS 2 system status using these commands:
-            - list_topics(): List all available ROS 2 topics
-            - list_nodes(): List all running ROS 2 nodes
-            - list_services(): List all available ROS 2 services
-            - list_actions(): List all available ROS 2 actions
-              You can control the turtle using these commands:
-            - move_forward(distance): Move turtle forward by specified distance
-            - rotate(angle): Rotate turtle by specified angle in degrees
-            - get_pose(): Get current position and orientation of turtle
-            
-            Return only the necessary actions and their results. e.g
+            """    
+            basic_tools_prompt2 = """
             Human: What ROS distribution am I using?
             AI: Current ROS distribution: humble
             Human: What is my ROS domain ID?
             AI: Current ROS domain ID: 0
             Human: Show me all running nodes
+            """
+        else:
+            basic_tools_prompt1 = ""
+            basic_tools_prompt2 = ""
+
+        if self.use_generic_tools == True:
+            generic_tools_prompt1 = """
+            You can check ROS 2 system status using these commands:
+            - get_ros_distro(): Get the current ROS distribution name
+            - get_domain_id(): Get the current ROS_DOMAIN_ID
+            """    
+            generic_tools_prompt2 = """
+            Human: Show me all running nodes
             AI: Here are the running ROS 2 nodes: [node list]
+            """
+        else:
+            generic_tools_prompt1 = ""
+            generic_tools_prompt2 = ""
+
+        if self.use_robot_tools == True:
+            robot_tools_prompt1 = """
+            You can control the turtle using these commands:
+            - move_forward(distance): Move turtle forward by specified distance
+            - rotate(angle): Rotate turtle by specified angle in degrees
+            - get_pose(): Get current position and orientation of turtle
+            """    
+            robot_tools_prompt2 = """
             Human: Move the turtle forward 2 units
             AI: Moving forward 2 units
-            """),
+            """
+        else:
+            robot_tools_prompt1 = ""
+            robot_tools_prompt2 = ""
+
+        system_prompt = """
+            You are a turtle control assistant for ROS 2 turtlesim.
+            """ + basic_tools_prompt1 + generic_tools_prompt1 + robot_tools_prompt1 + """
+            
+            Return only the necessary actions and their results. e.g
+            """ + basic_tools_prompt2 + generic_tools_prompt2 + robot_tools_prompt2 + """
+            """ 
+        self.get_logger().info('system_prompt : "%s"' % system_prompt)
+
+        self.prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
             MessagesPlaceholder("chat_history", optional=True),
             ("human", "{input}"),
             MessagesPlaceholder("agent_scratchpad"),
         ])
 
+        # Load OpenAI configuration
         share_dir = get_package_share_directory('ros2_ai_agent')
         config_dir = share_dir + '/config' + '/openai.env'
         load_dotenv(Path(config_dir))
 
-        # setup the toolkit with the class methods
+        # Setup toolkit
         self.toolkit = [
             get_ros_distro, get_domain_id,
             list_topics, list_nodes, list_services, list_actions,
-            move_forward, rotate, get_pose]
+            move_forward, rotate, get_pose
+        ]
 
         # Choose the LLM that will drive the agent
-        
-        # 
-        # GPT-5
-        #
-        # [ros2_ai_agent_turtlesim-2] [ERROR] [1759210085.895728632] [ros2_ai_agent_turtlesim]: Error processing prompt: Error code: 400 - {'error': {'message': 'Your organization must be verified to stream this model. Please go to: https://platform.openai.com/settings/organization/general and click on Verify Organization. If you just verified, it can take up to 15 minutes for access to propagate.', 'type': 'invalid_request_error', 'param': 'stream', 'code': 'unsupported_value'}}
-        #self.llm = ChatOpenAI(model="gpt-5-mini", temperature=0)
-        #self.llm = ChatOpenAI(model="gpt-5", temperature=0)
-
-        #
-        # GPT-4.1
-        #
-        #self.llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
-
-        #
-        # GPT-4o
-        #
-        #self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-        #self.llm = ChatOpenAI(model="gpt-4o", temperature=0)
-
-        #
-        # GPT-OSS
-        #
-        #self.llm = ChatOllama( model="gpt-oss", temperature=0, num_ctx=131072 )
         
         if self.llm_api == "openai":
             self.llm = ChatOpenAI(model=self.llm_model, temperature=0)
@@ -260,7 +283,7 @@ class ROS2AIAgent(Node):
         else:
             self.get_logger().error(f'Invalid llm_api: {self.llm_api}')
 
-        # Construct the OpenAI Tools agent
+        # Construct the AI Tools agent
         self.agent = create_openai_tools_agent(self.llm, self.toolkit, self.prompt)
 
         # Create an agent executor by passing in the agent and tools

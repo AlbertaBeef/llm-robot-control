@@ -78,12 +78,12 @@ By default, all the tools are enabled.  The agent is configuration with the foll
    - use_generic_tools:=True|False : list_topics, list_nodes, list_services, list_actions
    - use_robot_tools:=True|False : move_forward, rotate, get_pose
     
-In the second terminal, send prompts to the ROS2 AI Agent, as follows:
+In the second terminal, send user prompts to the ROS2 AI Agent as strings to the /llm_prompt topic:
 
-   - ros2 topic pub -1 /prompt std_msgs/msg/String "{data: 'List the ROS topics.'}"
-   - ros2 topic pub -1 /prompt std_msgs/msg/String "{data: 'Get the current position of the turtle.'}"
-   - ros2 topic pub -1 /prompt std_msgs/msg/String "{data: 'Advance the turtle 10.0 units.'}"
-   - ros2 topic pub -1 /prompt std_msgs/msg/String "{data: 'Turn the turtle 90 degres to the right.'}"
+   - ros2 topic pub -1 /llm_prompt std_msgs/msg/String "{data: 'List the ROS topics.'}"
+   - ros2 topic pub -1 /llm_prompt std_msgs/msg/String "{data: 'Get the current position of the turtle.'}"
+   - ros2 topic pub -1 /llm_prompt std_msgs/msg/String "{data: 'Advance the turtle 10.0 units.'}"
+   - ros2 topic pub -1 /llm_prompt std_msgs/msg/String "{data: 'Turn the turtle 90 degres to the right.'}"
 
 
 # Launching the ROS2 AI Agent for the Universal Robotics (UR) robotic arm
@@ -100,12 +100,12 @@ By default, all the tools are enabled.  The agent is configuration with the foll
    - use_generic_tools:=True|False : list_topics, list_nodes, list_services, list_actions
    - use_robot_tools:=True|False : move_to_pose, get_current_pose, move_to_named_target
    
-In the second terminal, send prompts to the ROS2 AI Agent, as follows:
+In the second terminal, send user prompts to the ROS2 AI Agent as strings to the /llm_prompt topic:
 
-   - ros2 topic pub -1 /prompt std_msgs/msg/String "{data: 'List the ROS topics.'}"
-   - ros2 topic pub -1 /prompt std_msgs/msg/String "{data: 'Move the robot to home position'}"
-   - ros2 topic pub -1 /prompt std_msgs/msg/String "{data: 'Get the current gripper pose'}"
-   - ros2 topic pub -1 /prompt std_msgs/msg/String "{data: 'Get the current position of end effector and reduce z value by 0.2'}"
+   - ros2 topic pub -1 /llm_prompt std_msgs/msg/String "{data: 'List the ROS topics.'}"
+   - ros2 topic pub -1 /llm_prompt std_msgs/msg/String "{data: 'Move the robot to home position'}"
+   - ros2 topic pub -1 /llm_prompt std_msgs/msg/String "{data: 'Get the current gripper pose'}"
+   - ros2 topic pub -1 /llm_prompt std_msgs/msg/String "{data: 'Get the current position of end effector and reduce z value by 0.2'}"
 
 # Validation Metrics
 

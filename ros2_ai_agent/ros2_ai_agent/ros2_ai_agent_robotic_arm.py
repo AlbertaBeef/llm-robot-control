@@ -72,6 +72,11 @@ class ROS2AIAgent(Node):
         @tool
         def get_ros_distro() -> str:
             """Get the current ROS distribution name."""
+
+            msg = String()
+            msg.data = f"get_ros_distro()"
+            self.llm_tool_calls_pub.publish(msg)
+
             try:
                 ros_distro = os.environ.get('ROS_DISTRO')
                 if (ros_distro):
@@ -84,6 +89,11 @@ class ROS2AIAgent(Node):
         @tool
         def get_domain_id() -> str:
             """Get the current ROS domain ID."""
+
+            msg = String()
+            msg.data = f"get_domain_id()"
+            self.llm_tool_calls_pub.publish(msg)
+
             try:
                 domain_id = os.environ.get('ROS_DOMAIN_ID', '0')  # Default is 0 if not set
                 return f"Current ROS domain ID: {domain_id}"
@@ -93,6 +103,11 @@ class ROS2AIAgent(Node):
         @tool
         def list_topics() -> str:
             """List all available ROS 2 topics."""
+
+            msg = String()
+            msg.data = f"list_topics()"
+            self.llm_tool_calls_pub.publish(msg)
+
             try:
                 result = subprocess.run(['ros2', 'topic', 'list'], 
                                  capture_output=True, text=True, check=True)
@@ -104,6 +119,11 @@ class ROS2AIAgent(Node):
         @tool
         def list_nodes() -> str:
             """List all running ROS 2 nodes."""
+
+            msg = String()
+            msg.data = f"list_nodes()"
+            self.llm_tool_calls_pub.publish(msg)
+
             try:
                 result = subprocess.run(['ros2', 'node', 'list'], 
                                  capture_output=True, text=True, check=True)
@@ -114,6 +134,11 @@ class ROS2AIAgent(Node):
         @tool
         def list_services() -> str:
             """List all available ROS 2 services."""
+
+            msg = String()
+            msg.data = f"list_services()"
+            self.llm_tool_calls_pub.publish(msg)
+
             try:
                 result = subprocess.run(['ros2', 'service', 'list'], 
                                  capture_output=True, text=True, check=True)
@@ -124,6 +149,11 @@ class ROS2AIAgent(Node):
         @tool
         def list_actions() -> str:
             """List all available ROS 2 actions."""
+
+            msg = String()
+            msg.data = f"list_actions()"
+            self.llm_tool_calls_pub.publish(msg)
+
             try:
                 result = subprocess.run(['ros2', 'action', 'list'], 
                                  capture_output=True, text=True, check=True)
@@ -238,13 +268,25 @@ class ROS2AIAgent(Node):
         # Create the subscriber for prompts
         self.subscription = self.create_subscription(
             String,
-            'prompt',
-            self.prompt_callback,
+            'llm_prompt',
+            self.llm_prompt_callback,
             10
         )
 
+        # Create the publisher for Tool usage confirmation
+        self.llm_output_pub = self.create_publisher(String, '/llm_tool_calls', 10)
+
+        # Create the publisher for LLM output
+        self.llm_output_pub = self.create_publisher(String, '/llm_output', 10)
+
+
     def move_to_pose(self, x: float, y: float, z: float) -> str:
         """Move robot end effector to specified x,y,z coordinates."""
+
+        msg = String()
+        msg.data = f"move_to_pose({x},{y},{z})"
+        self.llm_tool_calls_pub.publish(msg)
+
         try:
             # Create goal pose
             goal_pose = PoseStamped()
@@ -280,7 +322,7 @@ class ROS2AIAgent(Node):
 
     def create_pose_goal(self, pose_stamped):
         """Create pose goal constraints"""
-        constraints = Constraints()
+       constraints = Constraints()
         constraints.name = "pose_goal"
         
         # Add position constraints
@@ -324,6 +366,11 @@ class ROS2AIAgent(Node):
 
     def get_current_pose(self) -> str:
         """Get current pose of the robot end effector using TF2."""
+
+        msg = String()
+        msg.data = f"get_current_pose()"
+        self.llm_tool_calls_pub.publish(msg)
+
         try:
             # Get the transform from base_link to tool0
             transform = self.tf_buffer.lookup_transform(
@@ -341,6 +388,11 @@ class ROS2AIAgent(Node):
 
     def move_to_named_target(self, target_name: str) -> str:
         """Move robot to a predefined joint configuration."""
+
+        msg = String()
+        msg.data = f"move_to_named_target({target_name})"
+        self.llm_tool_calls_pub.publish(msg)
+
         try:
             if target_name not in self.goal_states:
                 return f"Unknown target position: {target_name}"
@@ -391,10 +443,15 @@ class ROS2AIAgent(Node):
         except Exception as e:
             return f"Error moving to {target_name}: {str(e)}"
 
-    def prompt_callback(self, msg):
+    def llm_prompt_callback(self, msg):
         try:
             result = self.agent_executor.invoke({"input": msg.data})
-            self.get_logger().info(f"Result: {result['output']}")
+            self.get_logger().info(f"Output: {result['output']}")
+
+            msg = String()
+            msg.data = f"Output: ({result['output']})"
+            self.llm_output_pub.publish(msg)
+
         except Exception as e:
             self.get_logger().error(f'Error processing prompt: {str(e)}')
 

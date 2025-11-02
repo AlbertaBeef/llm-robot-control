@@ -265,8 +265,10 @@ class ROS2AIAgent(Node):
         if self.use_generic_tools == True:
             generic_tools_prompt1 = """
             You can check ROS 2 system status using these commands:
-            - get_ros_distro(): Get the current ROS distribution name
-            - get_domain_id(): Get the current ROS_DOMAIN_ID
+            - list_topics(): List all available ROS 2 topics
+            - list_nodes(): List all running ROS 2 nodes
+            - list_services(): List all available ROS 2 services
+            - list_actions(): List all available ROS 2 actions
             """    
             generic_tools_prompt2 = """
             Human: Show me all running nodes

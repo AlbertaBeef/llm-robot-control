@@ -192,8 +192,10 @@ class ROS2AIAgent(Node):
         if self.use_generic_tools == True:
             generic_tools_prompt1 = """
             You can check ROS 2 system status using these commands:
-            - get_ros_distro(): Get the current ROS distribution name
-            - get_domain_id(): Get the current ROS_DOMAIN_ID
+            - list_topics(): List all available ROS 2 topics
+            - list_nodes(): List all running ROS 2 nodes
+            - list_services(): List all available ROS 2 services
+            - list_actions(): List all available ROS 2 actions
             """    
             generic_tools_prompt2 = """
             Human: Show me all running nodes
@@ -274,7 +276,7 @@ class ROS2AIAgent(Node):
         )
 
         # Create the publisher for Tool usage confirmation
-        self.llm_output_pub = self.create_publisher(String, '/llm_tool_calls', 10)
+        self.llm_tool_calls_pub = self.create_publisher(String, '/llm_tool_calls', 10)
 
         # Create the publisher for LLM output
         self.llm_output_pub = self.create_publisher(String, '/llm_output', 10)
@@ -322,7 +324,7 @@ class ROS2AIAgent(Node):
 
     def create_pose_goal(self, pose_stamped):
         """Create pose goal constraints"""
-       constraints = Constraints()
+        constraints = Constraints()
         constraints.name = "pose_goal"
         
         # Add position constraints

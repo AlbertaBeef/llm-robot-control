@@ -20,7 +20,7 @@ from moveit_msgs.msg import MotionPlanRequest, Constraints, PositionConstraint, 
 from moveit_msgs.msg import BoundingVolume
 from shape_msgs.msg import SolidPrimitive
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion, Vector3
-from langchain.agents import AgentExecutor, create_openai_tools_agent
+from langchain.agents import AgentExecutor, create_openai_tools_agent, create_tool_calling_agent
 from langchain_openai import ChatOpenAI
 from langchain_ollama import ChatOllama
 from langchain.tools import tool
@@ -30,12 +30,32 @@ from tf2_ros import TransformListener, Buffer
 from rclpy.duration import Duration
 from ament_index_python.packages import get_package_share_directory
 
+
+import subprocess
+from typing import List
+
+from rclpy.parameter import Parameter
+from rcl_interfaces.msg import SetParametersResult
+
+# Import the generated service type
+try:
+    from ros2_ai_agent.srv import SetLlmMode
+except Exception:
+    SetLlmMode = None
+
 class ROS2AIAgent(Node):
+    # --------------------------
+    # ROS2AIAgent constructor
+    # --------------------------
     def __init__(self):
         super().__init__('ros2_ai_agent')
         self.get_logger().info('ROS2 AI Agent for UR MoveIt2 has been started')
 
-        # LLM parameters        
+        # LLM parameters
+        self.declare_parameter('llm_enabled', True)
+        self.llm_enabled = self.get_parameter("llm_enabled").value
+        self.get_logger().info('llm_enabled : "%s"' % self.llm_enabled)
+        #
         self.declare_parameter("llm_api", "ollama")
         self.llm_api = self.get_parameter("llm_api").value
         self.get_logger().info('llm_api : "%s"' % self.llm_api)
@@ -69,6 +89,123 @@ class ROS2AIAgent(Node):
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
+        # Define predefined positions
+        self.goal_states = {
+            'home': [0.0, -1.57, 0.0, -1.57, 0.0, 0.0],  # Home position
+            'up': [0.0, -2.0, 0.0, -1.57, 0.0, 0.0]      # Up position
+        }
+
+        # Create System Prompt and LLM+Agent based on parameters
+        self.system_prompt_creator()
+        self.llm_agent_creator()        
+
+        # Create the subscriber for prompts
+        self.subscription = self.create_subscription(
+            String,
+            'llm_prompt',
+            self.llm_prompt_callback,
+            10
+        )
+
+        # Create the publisher for Tool usage confirmation
+        self.llm_tool_calls_pub = self.create_publisher(String, '/llm_tool_calls', 10)
+
+        # Create the publisher for LLM output
+        self.llm_output_pub = self.create_publisher(String, '/llm_output', 10)
+
+        # Validate parameter changes done via `ros2 param set`
+        self.add_on_set_parameters_callback(self.on_set_parameters_callback)
+
+        # LLM toggle service
+        if SetLlmMode is not None:
+            self.set_llm_srv = self.create_service(
+                SetLlmMode,
+                'set_llm_mode',
+                self.set_llm_mode_callback
+            )
+            self.get_logger().info('LLM state service /set_llm_mode ready (type: ros2_ai_agent/srv/SetLlmMode)')
+        else:
+            self.get_logger().warn(
+                'Service /SetLlmMode not available yet. Build the package (colcon build) to enable the service.'
+            )
+
+    # --------------------------
+    # System Prompt creator
+    # --------------------------
+    def system_prompt_creator(self):
+        if self.use_basic_tools == True:
+            basic_tools_prompt1 = """
+            You can check ROS 2 system status using these commands:
+            - get_ros_distro(): Get the current ROS distribution name
+            - get_domain_id(): Get the current ROS_DOMAIN_ID
+            """    
+            basic_tools_prompt2 = """
+            Human: What ROS distribution am I using?
+            AI: Current ROS distribution: humble
+            Human: What is my ROS domain ID?
+            AI: Current ROS domain ID: 0
+            Human: Show me all running nodes
+            """
+        else:
+            basic_tools_prompt1 = ""
+            basic_tools_prompt2 = ""
+
+        if self.use_generic_tools == True:
+            generic_tools_prompt1 = """
+            You can check ROS 2 system status using these commands:
+            - list_topics(): List all available ROS 2 topics
+            - list_nodes(): List all running ROS 2 nodes
+            - list_services(): List all available ROS 2 services
+            - list_actions(): List all available ROS 2 actions
+            """    
+            generic_tools_prompt2 = """
+            Human: Show me all running nodes
+            AI: Here are the running ROS 2 nodes: [node list]
+            """
+        else:
+            generic_tools_prompt1 = ""
+            generic_tools_prompt2 = ""
+
+        if self.use_robot_tools == True:
+            robot_tools_prompt1 = """
+            You can control the robot using these commands:
+            - move_to_pose(x, y, z): Move end effector to specified x,y,z coordinates
+            - get_current_pose(): Get current position of the end effector
+            - move_to_named_target(target_name): Move to predefined position (home, up)
+            """    
+            robot_tools_prompt2 = """
+            Human: Move the end effector to position x=0.5, y=0.0, z=0.5
+            AI: Moving end effector to position x: 0.5, y: 0.0, z: 0.5
+            Human: Move robot to home position
+            AI: Moving robot to home position
+            """
+        else:
+            robot_tools_prompt1 = ""
+            robot_tools_prompt2 = ""
+
+        if self.use_robot_tools == False:
+            self.system_prompt = """
+            You are a ROS 2 system information assistant.
+            """ + basic_tools_prompt1 + generic_tools_prompt1 + robot_tools_prompt1 + """
+            
+            Return only the necessary actions and their results. e.g
+            """ + basic_tools_prompt2 + generic_tools_prompt2 + robot_tools_prompt2 + """
+            """ 
+        else:                 
+            self.system_prompt = """
+            You are a UR robot control assistant using MoveIt 2.
+            """ + basic_tools_prompt1 + generic_tools_prompt1 + robot_tools_prompt1 + """
+            
+            Return only the necessary actions and their results. e.g
+            """ + basic_tools_prompt2 + generic_tools_prompt2 + robot_tools_prompt2 + """
+            """ 
+        self.get_logger().info('system_prompt : "%s"' % self.system_prompt)
+
+    # --------------------------
+    # LLM + Agent creator
+    # --------------------------
+    def llm_agent_creator(self):
+    
         @tool
         def get_ros_distro() -> str:
             """Get the current ROS distribution name."""
@@ -165,83 +302,9 @@ class ROS2AIAgent(Node):
         self.move_to_pose_tool = tool(self.move_to_pose)
         self.get_current_pose_tool = tool(self.get_current_pose)
         self.move_to_named_target_tool = tool(self.move_to_named_target)
-
-        # Define predefined positions
-        self.goal_states = {
-            'home': [0.0, -1.57, 0.0, -1.57, 0.0, 0.0],  # Home position
-            'up': [0.0, -2.0, 0.0, -1.57, 0.0, 0.0]      # Up position
-        }
-
-        if self.use_basic_tools == True:
-            basic_tools_prompt1 = """
-            You can check ROS 2 system status using these commands:
-            - get_ros_distro(): Get the current ROS distribution name
-            - get_domain_id(): Get the current ROS_DOMAIN_ID
-            """    
-            basic_tools_prompt2 = """
-            Human: What ROS distribution am I using?
-            AI: Current ROS distribution: humble
-            Human: What is my ROS domain ID?
-            AI: Current ROS domain ID: 0
-            Human: Show me all running nodes
-            """
-        else:
-            basic_tools_prompt1 = ""
-            basic_tools_prompt2 = ""
-
-        if self.use_generic_tools == True:
-            generic_tools_prompt1 = """
-            You can check ROS 2 system status using these commands:
-            - list_topics(): List all available ROS 2 topics
-            - list_nodes(): List all running ROS 2 nodes
-            - list_services(): List all available ROS 2 services
-            - list_actions(): List all available ROS 2 actions
-            """    
-            generic_tools_prompt2 = """
-            Human: Show me all running nodes
-            AI: Here are the running ROS 2 nodes: [node list]
-            """
-        else:
-            generic_tools_prompt1 = ""
-            generic_tools_prompt2 = ""
-
-        if self.use_robot_tools == True:
-            robot_tools_prompt1 = """
-            You can control the robot using these commands:
-            - move_to_pose(x, y, z): Move end effector to specified x,y,z coordinates
-            - get_current_pose(): Get current position of the end effector
-            - move_to_named_target(target_name): Move to predefined position (home, up)
-            """    
-            robot_tools_prompt2 = """
-            Human: Move the end effector to position x=0.5, y=0.0, z=0.5
-            AI: Moving end effector to position x: 0.5, y: 0.0, z: 0.5
-            Human: Move robot to home position
-            AI: Moving robot to home position
-            """
-        else:
-            robot_tools_prompt1 = ""
-            robot_tools_prompt2 = ""
-
-        if self.use_robot_tools == False:
-            system_prompt = """
-            You are a ROS 2 system information assistant.
-            """ + basic_tools_prompt1 + generic_tools_prompt1 + robot_tools_prompt1 + """
-            
-            Return only the necessary actions and their results. e.g
-            """ + basic_tools_prompt2 + generic_tools_prompt2 + robot_tools_prompt2 + """
-            """ 
-        else:                 
-            system_prompt = """
-            You are a UR robot control assistant using MoveIt 2.
-            """ + basic_tools_prompt1 + generic_tools_prompt1 + robot_tools_prompt1 + """
-            
-            Return only the necessary actions and their results. e.g
-            """ + basic_tools_prompt2 + generic_tools_prompt2 + robot_tools_prompt2 + """
-            """ 
-        self.get_logger().info('system_prompt : "%s"' % system_prompt)
-
+    
         self.prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
+            ("system", self.system_prompt),
             MessagesPlaceholder("chat_history", optional=True),
             ("human", "{input}"),
             MessagesPlaceholder("agent_scratchpad"),
@@ -262,7 +325,6 @@ class ROS2AIAgent(Node):
         ]
 
         # Choose the LLM that will drive the agent
-        
         if self.llm_api == "openai":
             self.llm = ChatOpenAI(model=self.llm_model, temperature=0)
         elif self.llm_api == "ollama":
@@ -271,26 +333,107 @@ class ROS2AIAgent(Node):
             self.get_logger().error(f'Invalid llm_api: {self.llm_api}')
 
         # Construct the AI Tools agent
-        self.agent = create_openai_tools_agent(self.llm, self.toolkit, self.prompt)
+        if self.llm_api == "openai":
+            self.agent = create_openai_tools_agent(self.llm, self.toolkit, self.prompt)
+        elif self.llm_api == "ollama":
+            self.agent = create_tool_calling_agent(self.llm, self.toolkit, self.prompt)
 
         # Create an agent executor by passing in the agent and tools
         self.agent_executor = AgentExecutor(agent=self.agent, tools=self.toolkit, verbose=True)
 
-        # Create the subscriber for prompts
-        self.subscription = self.create_subscription(
-            String,
-            'llm_prompt',
-            self.llm_prompt_callback,
-            10
-        )
+    # --------------------------
+    # Parameter change validator
+    # --------------------------
+    def on_set_parameters_callback(self, params: List[Parameter]) -> SetParametersResult:
+        result = SetParametersResult()
+        result.successful = True
+        result.reason = ''
 
-        # Create the publisher for Tool usage confirmation
-        self.llm_tool_calls_pub = self.create_publisher(String, '/llm_tool_calls', 10)
+        # Preview new values to cross-validate
+        next_enabled = self.llm_enabled
+        next_api = self.llm_api
+        next_model = self.llm_model
+        for p in params:
+            if p.name == 'llm_enabled' and p.type_ == Parameter.Type.BOOL:
+                next_enabled = p.value
+            elif p.name == 'llm_api' and p.type_ == Parameter.Type.STRING:
+                next_api = p.value
+            elif p.name == 'llm_model' and p.type_ == Parameter.Type.STRING:
+                next_model = p.value
 
-        # Create the publisher for LLM output
-        self.llm_output_pub = self.create_publisher(String, '/llm_output', 10)
+        # If enabling, require non-empty api and model
+        if next_enabled and (not next_api or not next_model):
+            result.successful = False
+            result.reason = 'Enabling LLM requires non-empty llm_api and llm_model.'
+            return result
 
+        # Passed validation — update mirrors for those included in this set
+        for p in params:
+            if p.name == 'llm_enabled' and p.type_ == Parameter.Type.BOOL:
+                self.llm_enabled = p.value
+            elif p.name == 'llm_api' and p.type_ == Parameter.Type.STRING:
+                self.llm_api = p.value
+            elif p.name == 'llm_model' and p.type_ == Parameter.Type.STRING:
+                self.llm_model = p.value
 
+        return result
+
+    # --------------------------
+    # Service handler
+    # --------------------------
+    def set_llm_mode_callback(self, request, response):
+        """
+        SetLlmMode.srv:
+          bool enable
+          string llm_api
+          string llm_model
+          ---
+          bool success
+          string message
+        """
+        enable = bool(request.enable)
+        api = request.llm_api.strip() if hasattr(request, 'llm_api') else ''
+        model = request.llm_model.strip() if hasattr(request, 'llm_model') else ''
+
+        if enable and (not api or not model):
+            response.success = False
+            response.message = 'When enabling, llm_api and llm_model must be provided.'
+            return response
+
+        # Apply via atomic parameter update so events/validators run consistently
+        changes: List[Parameter] = [Parameter('llm_enabled', Parameter.Type.BOOL, enable)]
+        if enable:
+            changes.extend([
+                Parameter('llm_api', Parameter.Type.STRING, api),
+                Parameter('llm_model', Parameter.Type.STRING, model),
+            ])
+
+        result = self.set_parameters_atomically(changes)
+        if not result.successful:
+            response.success = False
+            response.message = f'Failed to update parameters: {result.reason}'
+            return response
+
+        # Mirrors update in the callback; but ensure they reflect latest values
+        self.llm_enabled = enable
+        if enable:
+            self.llm_api = api
+            self.llm_model = model
+
+            # Create System Prompt and LLM+Agent based on parameters
+            self.system_prompt_creator()
+            self.llm_agent_creator()        
+
+        state = 'enabled' if self.llm_enabled else 'disabled'
+        extra = f' (api=\"{self.llm_api}\", model=\"{self.llm_model}\")' if self.llm_enabled else ''
+        self.get_logger().info(f'LLM {state}{extra}')
+        response.success = True
+        response.message = f'LLM {state}'
+        return response
+
+    # --------------------------
+    # Robot Tools
+    # --------------------------
     def move_to_pose(self, x: float, y: float, z: float) -> str:
         """Move robot end effector to specified x,y,z coordinates."""
 
@@ -454,6 +597,9 @@ class ROS2AIAgent(Node):
         except Exception as e:
             return f"Error moving to {target_name}: {str(e)}"
 
+    # --------------------------
+    # LLM prompt Callback
+    # --------------------------
     def llm_prompt_callback(self, msg):
         try:
             result = self.agent_executor.invoke({"input": msg.data})

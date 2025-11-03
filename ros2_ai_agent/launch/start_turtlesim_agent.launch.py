@@ -42,6 +42,7 @@ def generate_launch_description():
             executable='ros2_ai_agent_turtlesim',
             name='ros2_ai_agent_turtlesim',
             parameters=[
+               {"llm_enabled":True},
                {"llm_api":LaunchConfiguration("llm_api")},
                {"llm_model":LaunchConfiguration("llm_model")},
                {"use_basic_tools":PythonExpression(['"', LaunchConfiguration('use_basic_tools'), '" == "True"'])},

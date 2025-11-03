@@ -50,6 +50,7 @@ def generate_launch_description():
                 executable='ros2_ai_agent_robotic_arm',
                 name='ros2_ai_agent_robotic_arm',
                 parameters=[
+                   {"llm_enabled":True},
                    {"llm_api":LaunchConfiguration("llm_api")},
                    {"llm_model":LaunchConfiguration("llm_model")},
                    {"use_basic_tools":PythonExpression(['"', LaunchConfiguration('use_basic_tools'), '" == "True"'])},

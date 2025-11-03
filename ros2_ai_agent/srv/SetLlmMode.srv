@@ -1,0 +1,7 @@
+# Turn LLM on/off. When enabling, llm_api and llm_model must be provided.
+bool enable
+string llm_api
+string llm_model
+---
+bool success
+string message

@@ -222,13 +222,22 @@ class ROS2AIAgent(Node):
             robot_tools_prompt1 = ""
             robot_tools_prompt2 = ""
 
-        system_prompt = """
-            You are a UR robot control assistant using MoveIt 2.
-            """ + basic_tools_prompt1 + generic_tools_prompt1 + robot_tools_prompt1 + """
-            
-            Return only the necessary actions and their results. e.g
-            """ + basic_tools_prompt2 + generic_tools_prompt2 + robot_tools_prompt2 + """
-            """ 
+        if self.use_robot_tools == False:
+            system_prompt = """
+                You are a ROS 2 system information assistant.
+                """ + basic_tools_prompt1 + generic_tools_prompt1 + robot_tools_prompt1 + """
+                
+                Return only the necessary actions and their results. e.g
+                """ + basic_tools_prompt2 + generic_tools_prompt2 + robot_tools_prompt2 + """
+                """ 
+        else:                 
+            system_prompt = """
+                You are a UR robot control assistant using MoveIt 2.
+                """ + basic_tools_prompt1 + generic_tools_prompt1 + robot_tools_prompt1 + """
+                
+                Return only the necessary actions and their results. e.g
+                """ + basic_tools_prompt2 + generic_tools_prompt2 + robot_tools_prompt2 + """
+                """ 
         self.get_logger().info('system_prompt : "%s"' % system_prompt)
 
         self.prompt = ChatPromptTemplate.from_messages([

@@ -209,14 +209,10 @@ class ROS2AIAgent(Node):
             self.llm_tool_calls_pub.publish(msg)
 
             msg = Twist()
-            duration = float(distance)
-
-            msg.linear.x = duration * 0.1
+            msg.linear.x = distance
             
             # Publish for the calculated duration
             self.cmd_vel_pub.publish(msg)
-            #self.create_timer(duration, lambda: self.cmd_vel_pub.publish(Twist()))
-            #self.create_timer(duration, lambda: self.cmd_vel_pub.publish(msg))
             return f"Moved forward {distance} units"
 
         @tool
@@ -293,13 +289,22 @@ class ROS2AIAgent(Node):
             robot_tools_prompt1 = ""
             robot_tools_prompt2 = ""
 
-        system_prompt = """
-            You are a turtle control assistant for ROS 2 turtlesim.
-            """ + basic_tools_prompt1 + generic_tools_prompt1 + robot_tools_prompt1 + """
-            
-            Return only the necessary actions and their results. e.g
-            """ + basic_tools_prompt2 + generic_tools_prompt2 + robot_tools_prompt2 + """
-            """ 
+        if self.use_robot_tools == False:
+            system_prompt = """
+                You are a ROS 2 system information assistant.
+                """ + basic_tools_prompt1 + generic_tools_prompt1 + robot_tools_prompt1 + """
+                
+                Return only the necessary actions and their results. e.g
+                """ + basic_tools_prompt2 + generic_tools_prompt2 + robot_tools_prompt2 + """
+                """ 
+        else:                 
+            system_prompt = """
+                You are a turtle control assistant for ROS 2 turtlesim.
+                """ + basic_tools_prompt1 + generic_tools_prompt1 + robot_tools_prompt1 + """
+                
+                Return only the necessary actions and their results. e.g
+                """ + basic_tools_prompt2 + generic_tools_prompt2 + robot_tools_prompt2 + """
+                """ 
         self.get_logger().info('system_prompt : "%s"' % system_prompt)
 
         self.prompt = ChatPromptTemplate.from_messages([

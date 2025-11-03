@@ -31,13 +31,6 @@ def generate_launch_description():
             description="Include robot-specific tools."
         ), 
         Node(
-            package='turtlesim',
-            executable='turtlesim_node',
-            name='turtlesim',
-            output='screen',
-            emulate_tty=True,
-        ),
-        Node(
             package='ros2_ai_agent',
             executable='ros2_ai_agent_turtlesim',
             name='ros2_ai_agent_turtlesim',

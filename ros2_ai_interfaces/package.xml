@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>ros2_ai_agent</name>
+  <name>ros2_ai_interfaces</name>
   <version>0.0.1</version>
-  <description>ROS 2 AI agent package</description>
+  <description>ROS 2 AI agent interfaces package</description>
   <maintainer email="grouby177@gmail.com">AlbertaBeef</maintainer>
   <license>Apache License 2.0</license>
 
@@ -15,18 +15,24 @@
 
   <!-- Runtime deps -->
   <exec_depend>rclpy</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>transforms3d</exec_depend>
 
-  <!-- Extra Python/ROS deps -->
-  <depend>python3-pip</depend>
-  <depend>turtlesim</depend>
-  <depend>moveit-py</depend>
-  <depend>nav2_msgs</depend>
-  <depend>nav_msgs</depend>
+  <!-- Build tools -->
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  
+  <!-- Mixed Python + CMake -->
+  <build_depend>ament_cmake_python</build_depend>
 
+  <!-- Interface generation for srv -->
+  <build_depend>rosidl_default_generators</build_depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
+  <member_of_group>rosidl_interface_packages</member_of_group>
+
+  <!-- IMPORTANT: Use ament_cmake (or omit this block entirely) so CMake runs -->
   <export>
-    <build_type>ament_python</build_type>
+    <build_type>ament_cmake</build_type>
   </export>
 </package>

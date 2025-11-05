@@ -71,7 +71,7 @@ from rcl_interfaces.msg import SetParametersResult
 
 # Import the generated service type
 try:
-    from ros2_ai_agent.srv import SetLlmMode
+    from ros2_ai_interfaces.srv import SetLlmMode
 except Exception:
     SetLlmMode = None
 
@@ -155,7 +155,7 @@ class ROS2AIAgent(Node):
             self.get_logger().info('LLM state service /set_llm_mode ready (type: ros2_ai_agent/srv/SetLlmMode)')
         else:
             self.get_logger().warn(
-                'Service /SetLlmMode not available yet. Build the package (colcon build) to enable the service.'
+                'Service /SetLlmMode not available. Build and install the ros2_ai_interfaces packageto enable the service.'
             )
 
     # --------------------------

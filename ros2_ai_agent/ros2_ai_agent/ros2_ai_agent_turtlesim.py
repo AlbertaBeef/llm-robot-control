@@ -12,9 +12,10 @@ Classes:
     ROS2AIAgent(Node): A ROS2 node that subscribes to a topic and uses an AI agent to control the turtle.
 
 Functions:
-    General (ROS2 specific) Tools:
+    Basic (ROS2 specific) Tools:
     - get_ros_distro() -> str: Retrieves the current ROS distribution name.
     - get_domain_id() -> str: Retrieves the current ROS domain ID.
+    General (ROS2 specific) Tools:
     - list_topics() -> str: Lists all available ROS 2 topics.
     - list_nodes() -> str: Lists all running ROS 2 nodes.
     - list_services() -> str: Lists all available ROS 2 services.
@@ -124,6 +125,7 @@ class ROS2AIAgent(Node):
 
         # Create System Prompt and LLM+Agent based on parameters
         self.system_prompt_creator()
+        self.toolkit_creator()
         self.llm_agent_creator()        
 
         # Create the subscriber for prompts
@@ -227,10 +229,17 @@ class ROS2AIAgent(Node):
         self.get_logger().info('system_prompt : "%s"' % self.system_prompt)
 
     # --------------------------
-    # LLM + Agent creator
+    # Robot Tools
     # --------------------------
-    def llm_agent_creator(self):
-    
+    def pose_callback(self, msg):
+        """Callback to update turtle's pose"""
+        self.turtle_pose = msg
+
+    # --------------------------
+    # Toolkit creator
+    # --------------------------
+    def toolkit_creator(self):
+
         @tool
         def get_ros_distro() -> str:
             """Get the current ROS distribution name."""
@@ -364,6 +373,19 @@ class ROS2AIAgent(Node):
             self.llm_tool_calls_pub.publish(msg)
 
             return f"x: {self.turtle_pose.x:.2f}, y: {self.turtle_pose.y:.2f}, theta: {math.degrees(self.turtle_pose.theta):.2f} degrees"
+
+        # Setup toolkit
+        self.toolkit = [
+            get_ros_distro, get_domain_id,
+            list_topics, list_nodes, list_services, list_actions,
+            move_forward, rotate, get_pose
+        ]
+
+    # --------------------------
+    # LLM + Agent creator
+    # --------------------------
+    def llm_agent_creator(self):
+    
     
         self.prompt = ChatPromptTemplate.from_messages([
             ("system", self.system_prompt),
@@ -376,13 +398,6 @@ class ROS2AIAgent(Node):
         share_dir = get_package_share_directory('ros2_ai_agent')
         config_dir = share_dir + '/config' + '/openai.env'
         load_dotenv(Path(config_dir))
-
-        # Setup toolkit
-        self.toolkit = [
-            get_ros_distro, get_domain_id,
-            list_topics, list_nodes, list_services, list_actions,
-            move_forward, rotate, get_pose
-        ]
 
         # Choose the LLM that will drive the agent
         if self.llm_api == "openai":
@@ -482,7 +497,12 @@ class ROS2AIAgent(Node):
 
             # Create System Prompt and LLM+Agent based on parameters
             self.system_prompt_creator()
+            self.toolkit_creator()
             self.llm_agent_creator()        
+        else:
+            # There does not seem to be a way to close/cleanup LLM + Agent
+            self.llm_api = None
+            self.llm_model = None
 
         state = 'enabled' if self.llm_enabled else 'disabled'
         extra = f' (api=\"{self.llm_api}\", model=\"{self.llm_model}\")' if self.llm_enabled else ''
@@ -490,13 +510,6 @@ class ROS2AIAgent(Node):
         response.success = True
         response.message = f'LLM {state}'
         return response
-
-    # --------------------------
-    # Pose Callback
-    # --------------------------
-    def pose_callback(self, msg):
-        """Callback to update turtle's pose"""
-        self.turtle_pose = msg
 
     # --------------------------
     # LLM prompt Callback

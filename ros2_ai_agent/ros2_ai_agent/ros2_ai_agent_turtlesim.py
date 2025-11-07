@@ -56,7 +56,8 @@ from ament_index_python.packages import get_package_share_directory, get_package
 from pathlib import Path
 
 from transforms3d.euler import quat2euler  # Replace tf_transformations import
-from langchain.agents import AgentExecutor, create_openai_tools_agent, create_tool_calling_agent
+from langchain.agents import AgentExecutor
+from langchain.agents import create_openai_tools_agent, create_tool_calling_agent
 from langchain_openai import ChatOpenAI
 from langchain_ollama import ChatOllama
 from langchain.tools import BaseTool, StructuredTool, tool
@@ -128,10 +129,10 @@ class ROS2AIAgent(Node):
         self.toolkit_creator()
         self.llm_agent_creator()        
 
-        # Create the subscriber for prompts
-        self.subscription = self.create_subscription(
+        # Create the subscriber for /llm_prompt
+        self.llm_prompt_sub = self.create_subscription(
             String,
-            'llm_prompt',
+            '/llm_prompt',
             self.llm_prompt_callback,
             10
         )
@@ -145,14 +146,14 @@ class ROS2AIAgent(Node):
         # Validate parameter changes done via `ros2 param set`
         self.add_on_set_parameters_callback(self.on_set_parameters_callback)
 
-        # LLM toggle service
+        # LLM configuration service
         if SetLlmMode is not None:
             self.set_llm_srv = self.create_service(
                 SetLlmMode,
                 'set_llm_mode',
                 self.set_llm_mode_callback
             )
-            self.get_logger().info('LLM state service /set_llm_mode ready (type: ros2_ai_agent/srv/SetLlmMode)')
+            self.get_logger().info('LLM state service /set_llm_mode ready (type: ros2_ai_interfaces/srv/SetLlmMode)')
         else:
             self.get_logger().warn(
                 'Service /SetLlmMode not available. Build and install the ros2_ai_interfaces packageto enable the service.'
@@ -517,6 +518,7 @@ class ROS2AIAgent(Node):
     def llm_prompt_callback(self, msg):
         try:
             result = self.agent_executor.invoke({"input": msg.data})
+            self.get_logger().info(f"Result: {result}")
             self.get_logger().info(f"Output: {result['output']}")
 
             msg = String()
@@ -526,6 +528,10 @@ class ROS2AIAgent(Node):
         except Exception as e:
             self.get_logger().error(f'Error processing prompt: {str(e)}')
 
+            msg = String()
+            msg.data = f"Error: ({str(e)})"
+            self.llm_output_pub.publish(msg)
+            
 def main(args=None):
     rclpy.init(args=args)
     node = ROS2AIAgent()

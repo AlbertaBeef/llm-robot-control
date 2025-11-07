@@ -18,6 +18,7 @@
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>transforms3d</exec_depend>
+  <exec_depend>ros2_ai_interfaces</exec_depend>
 
   <!-- Extra Python/ROS deps -->
   <depend>python3-pip</depend>

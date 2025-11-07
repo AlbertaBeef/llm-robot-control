@@ -26,16 +26,8 @@ The following dependencies are required:
    - langchain-openai
    - langchain-ollama
 
-[INCORRECT] The robotic arm agent requires the ur_simulation_gz package, for Universal Robots robotic arm, 
-which can be installed as follows:
 
-   - git clone -b ros2 https://github.com/UniversalRobots/Universal_Robots_ROS2_GZ_Simulation.git ur_simulation_gz
-   - cd ur_simulation_gz
-   - rosdep update && rosdep install --ignore-src --from-paths . -y
-   - colcon build
-   - source install/setup.bash
-
-[CORRECT] The robotic arm agent requires the ur_simulation_gz package, from Universal Robots, which can be installed as follows:
+The robotic arm agent requires the ur_simulation_gz package, from Universal Robots, which can be installed as follows:
 
    - apt install ros-jazzy-ur
    - apt install ros-jazzy-ur-simulation-gz

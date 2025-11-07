@@ -206,6 +206,11 @@ class ROS2AIAgent(Node):
     # --------------------------
     # Robot Tools
     # --------------------------
+    def reset_robot(self):
+        """Reset robotic arm (TBD)."""
+
+        self.get_logger().info(f"Robot (robotic arm) reset (not implemented yet).")
+
     def move_to_pose(self, x: float, y: float, z: float) -> str:
         """Move robot end effector to specified x,y,z coordinates."""
 
@@ -567,6 +572,11 @@ class ROS2AIAgent(Node):
           bool success
           string message
         """
+
+        # Reset robot
+        self.reset_robot()
+
+        # Configure new LLM + Agent
         enable = bool(request.enable)
         api = request.llm_api.strip() if hasattr(request, 'llm_api') else ''
         model = request.llm_model.strip() if hasattr(request, 'llm_model') else ''

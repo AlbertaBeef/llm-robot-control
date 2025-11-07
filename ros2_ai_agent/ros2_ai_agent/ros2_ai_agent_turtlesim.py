@@ -70,6 +70,8 @@ from typing import List
 from rclpy.parameter import Parameter
 from rcl_interfaces.msg import SetParametersResult
 
+from std_srvs.srv import Empty
+
 # Import the generated service type
 try:
     from ros2_ai_interfaces.srv import SetLlmMode
@@ -145,6 +147,12 @@ class ROS2AIAgent(Node):
 
         # Validate parameter changes done via `ros2 param set`
         self.add_on_set_parameters_callback(self.on_set_parameters_callback)
+
+        # Reset turtle service
+        self.reset_turtle_cli = self.create_client(
+            Empty, 
+            'reset'
+        )
 
         # LLM configuration service
         if SetLlmMode is not None:
@@ -232,6 +240,16 @@ class ROS2AIAgent(Node):
     # --------------------------
     # Robot Tools
     # --------------------------
+    def reset_robot(self):
+        """Reset turtle (clear lines, position turtle in center)."""
+        
+        # Send service request to reset turtlesim
+        try:
+            self.reset_turtle_cli.call_async(Empty.Request())
+            self.get_logger().info(f"Robot (turtlesim) reset.")
+        except:
+            self.get_logger().info("Failed to reset turtlesim !")
+
     def pose_callback(self, msg):
         """Callback to update turtle's pose"""
         self.turtle_pose = msg
@@ -334,6 +352,7 @@ class ROS2AIAgent(Node):
                 return f"Error listing actions: {str(e)}"
 
         # setup the tools as class methods
+
         @tool
         def move_forward(distance: float) -> str:
             """Move turtle forward by specified distance."""
@@ -467,6 +486,11 @@ class ROS2AIAgent(Node):
           bool success
           string message
         """
+
+        # Reset robot
+        self.reset_robot()
+
+        # Configure new LLM + Agent
         enable = bool(request.enable)
         api = request.llm_api.strip() if hasattr(request, 'llm_api') else ''
         model = request.llm_model.strip() if hasattr(request, 'llm_model') else ''

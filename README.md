@@ -20,12 +20,18 @@ The repository can be cloned as follows:
 
 The following dependencies are required:
 
-   - langchain
-   - langchain-core
-   - langchain-community
-   - langchain-openai
-   - langchain-ollama
-
+   - langchain==0.3.27
+   - langchain-community==0.3.31
+   - langchain-core==0.3.79
+   - langchain-text-splitters==0.3.11
+	
+   - langchain-openai==0.3.35
+   - openai==2.7.1
+	
+   - langchain-ollama==0.3.10
+   - ollama==0.6.0
+  
+NOTE : The current implementation does not support the latest langchain 1.0 version
 
 The robotic arm agent requires the ur_simulation_gz package, from Universal Robots, which can be installed as follows:
 

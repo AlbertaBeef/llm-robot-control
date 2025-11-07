@@ -1,0 +1,16 @@
+llm_api,llm_model
+openai,gpt-4o-mini
+openai,gpt-4o
+ollama,gpt-oss:20b
+ollama,llama3.1:8b
+ollama,llama3.1:70b
+ollama,llama3.2:1b
+ollama,llama3.2:3b
+ollama,mistral:7b
+ollama,qwen2.5:7b
+ollama,qwen2.5:32b
+ollama,qwen2.5:72b
+ollama,qwen2.5-coder:7b
+ollama,qwen2.5-coder:32b
+ollama,qwen3:8b
+ollama,qwen3:32b

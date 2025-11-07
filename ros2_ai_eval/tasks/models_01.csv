@@ -1,0 +1,2 @@
+llm_api,llm_model
+ollama,gpt-oss:20b

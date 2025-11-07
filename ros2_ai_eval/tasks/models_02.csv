@@ -1,0 +1,4 @@
+llm_api,llm_model
+ollama,qwen2.5:32b
+ollama,qwen3:8b
+

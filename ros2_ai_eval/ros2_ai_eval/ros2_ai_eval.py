@@ -30,7 +30,7 @@ class Ros2AIEval(Node):
         super().__init__('ros2_ai_eval')
         self.get_logger().info('ROS2 AI Agent Evaluator has been started')
         
-        # CSV parameters
+        # Parameters
         #
         self.declare_parameter("models_csv", "models.csv")
         self.models_csv = self.get_parameter("models_csv").value
@@ -43,7 +43,11 @@ class Ros2AIEval(Node):
         self.declare_parameter("results_csv", "results.csv")
         self.results_csv = self.get_parameter("results_csv").value
         self.get_logger().info('results_csv : "%s"' % self.results_csv)
-        
+        #
+        self.declare_parameter("task_delay", 1.0)
+        self.task_delay = self.get_parameter("task_delay").value
+        self.get_logger().info('task_delay : "%f"' % self.task_delay)
+
         # Publishers and Subscribers
         self.pub_llm_prompt = self.create_publisher(String, '/llm_prompt', 10)
         self.sub_llm_tool_calls = self.create_subscription(String, '/llm_tool_calls', self.llm_tool_calls_callback, 10)
@@ -82,6 +86,9 @@ class Ros2AIEval(Node):
         self.results = []
         self.llm_tool_calls = []
         self.llm_output = []
+
+        # Timer for one-shot delays
+        self.task_delay_timer = None
 
         # Start evaluation
         self.model_id = 0
@@ -149,10 +156,6 @@ class Ros2AIEval(Node):
         except Exception as e:
             self.get_logger().error(f"Service call failed: {e}")
 
-
-        # Add a small delay to ensure agent is fully ready
-        #self.create_timer(2.0, self.continue_evaluation, oneshot=True)
-
         # Continue immediately - service already ensured agent is configured
         self.continue_evaluation()
 
@@ -201,7 +204,19 @@ class Ros2AIEval(Node):
                 self.get_logger().info('=======================================')
                 #rclpy.shutdown()
                 return
-                
+
+        # Add 1-second delay before continuing to next task
+        self.get_logger().info(f"Waiting {self.task_delay} second before next task...")
+        self.task_delay_timer = self.create_timer(self.task_delay, self.proceed_to_next_task)
+
+    def proceed_to_next_task(self):
+        """Called after 1-second delay to continue evaluation"""
+        # Cancel and destroy the timer (one-shot behavior)
+        if self.task_delay_timer is not None:
+            self.task_delay_timer.cancel()
+            self.destroy_timer(self.task_delay_timer)
+            self.task_delay_timer = None
+
         self.evaluate_task()
 
     def write_results(self):

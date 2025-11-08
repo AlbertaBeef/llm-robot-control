@@ -50,6 +50,11 @@ def generate_launch_description():
         default_value="results.csv",
         description="Name of CSV file to store evaluation results"
     )
+    task_delay_arg =  DeclareLaunchArgument(
+        "task_delay",
+        default_value='1.0',
+        description="Delay before each task"
+    )
 
     # Turtlesim
     turtlesim_node = Node(
@@ -93,7 +98,8 @@ def generate_launch_description():
                 parameters=[
                    {"models_csv":LaunchConfiguration("models_csv")},
                    {"tasks_csv":LaunchConfiguration("tasks_csv")},
-                   {"results_csv":LaunchConfiguration("results_csv")}               
+                   {"results_csv":LaunchConfiguration("results_csv")},
+                   {"task_delay":LaunchConfiguration("task_delay")}
                 ]
             ) 
         ]
@@ -102,7 +108,7 @@ def generate_launch_description():
     return LaunchDescription([
         llm_api_arg, llm_model_arg,
         use_basic_tools_arg, use_generic_tools_arg, use_robot_tools_arg,
-        models_csv_arg, tasks_csv_arg, results_csv_arg,
+        models_csv_arg, tasks_csv_arg, results_csv_arg, task_delay_arg,
         turtlesim_node,
         delayed_agent_node,
         delayed_eval_node

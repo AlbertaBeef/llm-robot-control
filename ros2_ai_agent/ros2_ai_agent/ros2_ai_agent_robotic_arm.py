@@ -11,10 +11,12 @@ Acknowledgements:
 
 import os
 from pathlib import Path
+from std_msgs.msg import String
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
-from std_msgs.msg import String
+from rclpy.task import Future
+
 from moveit_msgs.action import MoveGroup
 from moveit_msgs.msg import MotionPlanRequest, Constraints, PositionConstraint, JointConstraint
 from moveit_msgs.msg import BoundingVolume
@@ -77,7 +79,12 @@ class ROS2AIAgent(Node):
         self.declare_parameter("use_robot_tools", True)
         self.use_robot_tools = self.get_parameter("use_robot_tools").value
         self.get_logger().info('use_robot_tools : "%s"' % self.use_robot_tools)
-       
+
+        # Delay parameters
+        self.declare_parameter("tool_delay", 1.0)
+        self.tool_delay = self.get_parameter("tool_delay").value
+        self.get_logger().info('tool_delay : "%f"' % self.tool_delay) 
+
         # Create action client
         self.move_action = ActionClient(self, MoveGroup, 'move_action')
         
@@ -210,6 +217,18 @@ class ROS2AIAgent(Node):
         """Reset robotic arm (TBD)."""
 
         self.get_logger().info(f"Robot (robotic arm) reset (not implemented yet).")
+
+    def tool_delay_wait(self):
+        self.get_logger().info(f"Tool Delay : Waiting {self.tool_delay} seconds after tool call ...")
+        self.tool_delay_future = Future()
+            
+        self.tool_delay_timer = self.create_timer(self.tool_delay, self.tool_delay_timer_callback)
+        rclpy.spin_until_future_complete(self, self.tool_delay_future)
+
+    def tool_delay_timer_callback(self):
+        self.get_logger().info(f"Tool Delay : done")    
+        self.tool_delay_future.set_result(None)
+        self.destroy_timer(self.tool_delay_timer)
 
     def move_to_pose(self, x: float, y: float, z: float) -> str:
         """Move robot end effector to specified x,y,z coordinates."""

@@ -44,6 +44,7 @@ Dependencies:
     - rclpy (rclpy, Node)
 """
 
+import time
 import os
 import math
 from geometry_msgs.msg import Twist
@@ -51,7 +52,8 @@ from turtlesim.msg import Pose
 from std_msgs.msg import String
 import rclpy
 from rclpy.node import Node
-
+from rclpy.task import Future
+        
 from ament_index_python.packages import get_package_share_directory, get_package_prefix
 from pathlib import Path
 
@@ -111,6 +113,11 @@ class ROS2AIAgent(Node):
         self.declare_parameter("use_robot_tools", True)
         self.use_robot_tools = self.get_parameter("use_robot_tools").value
         self.get_logger().info('use_robot_tools : "%s"' % self.use_robot_tools)
+        
+        # Delay parameters
+        self.declare_parameter("tool_delay", 1.0)
+        self.tool_delay = self.get_parameter("tool_delay").value
+        self.get_logger().info('tool_delay : "%f"' % self.tool_delay)        
         
         # Initialize turtle pose
         self.turtle_pose = Pose()
@@ -230,6 +237,10 @@ class ROS2AIAgent(Node):
         else:                 
             self.system_prompt = """
             You are a turtle control assistant for ROS 2 turtlesim.
+            
+            The turtle lives in a 2-dimensional world of size 11.0 x 11.0 units, called turtlesim.
+            You are not allowed to make the turtle hit the boundaries of this world.
+            
             """ + basic_tools_prompt1 + generic_tools_prompt1 + robot_tools_prompt1 + """
             
             Return only the necessary actions and their results. e.g
@@ -249,6 +260,25 @@ class ROS2AIAgent(Node):
             self.get_logger().info(f"Robot (turtlesim) reset.")
         except:
             self.get_logger().info("Failed to reset turtlesim !")
+
+    # This implementation prevents /llm_output from being received by ros2_ai_eval, causing deadlock ... 
+    #def tool_delay_wait(self):
+    #    self.get_logger().info(f"Tool Delay : Waiting {self.tool_delay} seconds after tool call ...")
+    #    self.tool_delay_future = Future()
+    #        
+    #    self.tool_delay_timer = self.create_timer(self.tool_delay, self.tool_delay_timer_callback)
+    #    rclpy.spin_until_future_complete(self, self.tool_delay_future)
+    #
+    #def tool_delay_timer_callback(self):
+    #    self.get_logger().info(f"Tool Delay : done")    
+    #    self.tool_delay_future.set_result(None)
+    #    self.destroy_timer(self.tool_delay_timer)
+
+    # This implementation works
+    def tool_delay_wait(self):
+        self.get_logger().info(f"Tool Delay : Waiting {self.tool_delay} seconds after tool call ...")
+        time.sleep(self.tool_delay)
+        self.get_logger().info(f"Tool Delay : done")
 
     def pose_callback(self, msg):
         """Callback to update turtle's pose"""
@@ -355,7 +385,7 @@ class ROS2AIAgent(Node):
 
         @tool
         def move_forward(distance: float) -> str:
-            """Move turtle forward by specified distance."""
+            """Move turtle forward by specified distance (positive to move forward, negative to move backward)."""
 
             msg = String()
             msg.data = f"move_forward({distance})"
@@ -363,14 +393,16 @@ class ROS2AIAgent(Node):
 
             msg = Twist()
             msg.linear.x = distance
-            
-            # Publish for the calculated duration
             self.cmd_vel_pub.publish(msg)
+            
+            if self.tool_delay > 0.0:
+                self.tool_delay_wait()
+            
             return f"Moved forward {distance} units"
 
         @tool
         def rotate(angle: float) -> str:
-            """Rotate turtle by specified angle in degrees (positive for counterclockwise)."""
+            """Rotate turtle by specified angle in degrees (positive for counterclockwise or left, negative for clockwise or right)."""
 
             msg = String()
             msg.data = f"rotate({angle})"
@@ -378,10 +410,11 @@ class ROS2AIAgent(Node):
 
             msg = Twist()
             msg.angular.z = math.radians(float(angle))
-            duration = 1.0  # Time to complete rotation
-            
             self.cmd_vel_pub.publish(msg)
-            self.create_timer(duration, lambda: self.cmd_vel_pub.publish(Twist()))
+            
+            if self.tool_delay > 0.0:
+                self.tool_delay_wait()
+            
             return f"Rotated {angle} degrees"
 
         @tool

@@ -30,6 +30,11 @@ def generate_launch_description():
             default_value="False",
             description="Include robot-specific tools."
         ), 
+        DeclareLaunchArgument(
+            "tool_delay",
+            default_value="1.0",
+            description="Delay after certain robot tool calls."
+        ),
         Node(
             package='ros2_ai_agent',
             executable='ros2_ai_agent_turtlesim',
@@ -40,7 +45,8 @@ def generate_launch_description():
                {"llm_model":LaunchConfiguration("llm_model")},
                {"use_basic_tools":PythonExpression(['"', LaunchConfiguration('use_basic_tools'), '" == "True"'])},
                {"use_generic_tools":PythonExpression(['"', LaunchConfiguration('use_generic_tools'), '" == "True"'])},
-               {"use_robot_tools":PythonExpression(['"', LaunchConfiguration('use_robot_tools'), '" == "True"'])}
+               {"use_robot_tools":PythonExpression(['"', LaunchConfiguration('use_robot_tools'), '" == "True"'])},
+               {"tool_delay":LaunchConfiguration("tool_delay")}
             ],
             output='screen',
             emulate_tty=True,

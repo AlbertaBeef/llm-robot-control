@@ -40,6 +40,11 @@ def generate_launch_description():
         default_value="True",
         description="Include robot-specific tools (move_to_pose, get_current_pose, move_to_named_target."
     )
+    tool_delay_arg = DeclareLaunchArgument(
+        "tool_delay",
+        default_value="1.0",
+        description="Delay after certain robot tool calls."
+    )
 
     # Define the AI agent node with a delay
     delayed_agent = TimerAction(
@@ -55,7 +60,8 @@ def generate_launch_description():
                    {"llm_model":LaunchConfiguration("llm_model")},
                    {"use_basic_tools":PythonExpression(['"', LaunchConfiguration('use_basic_tools'), '" == "True"'])},
                    {"use_generic_tools":PythonExpression(['"', LaunchConfiguration('use_generic_tools'), '" == "True"'])},
-                   {"use_robot_tools":PythonExpression(['"', LaunchConfiguration('use_robot_tools'), '" == "True"'])}
+                   {"use_robot_tools":PythonExpression(['"', LaunchConfiguration('use_robot_tools'), '" == "True"'])},
+                   {"tool_delay":LaunchConfiguration("tool_delay")}
                 ],
                 output='screen',
                 emulate_tty=True,
@@ -66,6 +72,7 @@ def generate_launch_description():
     return LaunchDescription([
         llm_api_arg, llm_model_arg,
         use_basic_tools_arg, use_generic_tools_arg, use_robot_tools_arg,
+        tool_delay_arg,
         ur_moveit_launch,
         delayed_agent
     ])

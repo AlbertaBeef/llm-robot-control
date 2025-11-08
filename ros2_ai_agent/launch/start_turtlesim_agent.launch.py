@@ -30,6 +30,11 @@ def generate_launch_description():
             default_value="True",
             description="Include robot-specific tools (move_forward, rotate, get_pose)."
         ), 
+        DeclareLaunchArgument(
+            "tool_delay",
+            default_value="1.0",
+            description="Delay after certain robot tool calls."
+        ),        
         Node(
             package='turtlesim',
             executable='turtlesim_node',
@@ -47,7 +52,8 @@ def generate_launch_description():
                {"llm_model":LaunchConfiguration("llm_model")},
                {"use_basic_tools":PythonExpression(['"', LaunchConfiguration('use_basic_tools'), '" == "True"'])},
                {"use_generic_tools":PythonExpression(['"', LaunchConfiguration('use_generic_tools'), '" == "True"'])},
-               {"use_robot_tools":PythonExpression(['"', LaunchConfiguration('use_robot_tools'), '" == "True"'])}
+               {"use_robot_tools":PythonExpression(['"', LaunchConfiguration('use_robot_tools'), '" == "True"'])},
+               {"tool_delay":LaunchConfiguration("tool_delay")}               
             ],
             output='screen',
             emulate_tty=True,

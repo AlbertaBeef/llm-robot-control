@@ -205,18 +205,24 @@ class Ros2AIEval(Node):
                 #rclpy.shutdown()
                 return
 
-        # Add 1-second delay before continuing to next task
-        self.get_logger().info(f"Waiting {self.task_delay} second before next task...")
-        self.task_delay_timer = self.create_timer(self.task_delay, self.proceed_to_next_task)
+        if self.task_delay > 0.0:
+            # Add task delay before continuing to next task
+            self.get_logger().info(f"Task Delay : Waiting {self.task_delay} seconds before next task...")
+            self.task_delay_timer = self.create_timer(self.task_delay, self.proceed_to_next_task)
+        else:
+            # Proceed to next task without delay
+            self.evaluate_task()
 
     def proceed_to_next_task(self):
-        """Called after 1-second delay to continue evaluation"""
+        """Called after task delay to continue evaluation"""
+        self.get_logger().info(f"Task Delay : done")        
         # Cancel and destroy the timer (one-shot behavior)
         if self.task_delay_timer is not None:
             self.task_delay_timer.cancel()
             self.destroy_timer(self.task_delay_timer)
             self.task_delay_timer = None
 
+        # Proceed to next task after delay
         self.evaluate_task()
 
     def write_results(self):

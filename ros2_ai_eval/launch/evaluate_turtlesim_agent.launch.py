@@ -32,8 +32,13 @@ def generate_launch_description():
     use_robot_tools_arg = DeclareLaunchArgument(
         "use_robot_tools",
         default_value="True",
-        description="Include robot-specific tools (move_to_pose, get_current_pose, move_to_named_target."
+        description="Include robot-specific tools  (move_forward, rotate, get_pose)."
     )
+    tool_delay_arg = DeclareLaunchArgument(
+        "tool_delay",
+        default_value="1.0",
+        description="Delay after certain robot tool calls  (move_forward, rotate)."
+    )  
     #
     models_csv_arg = DeclareLaunchArgument(
         "models_csv",
@@ -79,7 +84,8 @@ def generate_launch_description():
                    {"llm_model":LaunchConfiguration("llm_model")},
                    {"use_basic_tools":PythonExpression(['"', LaunchConfiguration('use_basic_tools'), '" == "True"'])},
                    {"use_generic_tools":PythonExpression(['"', LaunchConfiguration('use_generic_tools'), '" == "True"'])},
-                   {"use_robot_tools":PythonExpression(['"', LaunchConfiguration('use_robot_tools'), '" == "True"'])}
+                   {"use_robot_tools":PythonExpression(['"', LaunchConfiguration('use_robot_tools'), '" == "True"'])},
+                   {"tool_delay":LaunchConfiguration("tool_delay")}
                 ],
                 output='screen',
                 emulate_tty=True,
@@ -108,7 +114,9 @@ def generate_launch_description():
     return LaunchDescription([
         llm_api_arg, llm_model_arg,
         use_basic_tools_arg, use_generic_tools_arg, use_robot_tools_arg,
-        models_csv_arg, tasks_csv_arg, results_csv_arg, task_delay_arg,
+        tool_delay_arg,
+        models_csv_arg, tasks_csv_arg, results_csv_arg,
+        task_delay_arg,
         turtlesim_node,
         delayed_agent_node,
         delayed_eval_node

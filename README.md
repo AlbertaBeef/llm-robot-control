@@ -39,7 +39,7 @@ The robotic arm agent requires the ur_simulation_gz package, from Universal Robo
    - apt install ros-jazzy-ur-simulation-gz
    
    
-# Building the ROS2 AI Agent package
+# Building the ROS2 packages
 
 The ros2_ai_agent package can be built and installed as follows:
 
@@ -47,6 +47,22 @@ The ros2_ai_agent package can be built and installed as follows:
    - rosdep update && rosdep install --ignore-src --from-paths . -y
    - colcon build
    - source install/setup.bash
+   - cd ..
+
+The ros2_ai_interfaces package can be built and installed as follows:
+
+   - cd ros2_ai_interfaces
+   - colcon build
+   - source install/setup.bash
+   - cd ..
+
+The ros2_ai_eval package can be built and installed as follows:
+
+   - cd ros2_ai_eval
+   - rosdep update && rosdep install --ignore-src --from-paths . -y
+   - colcon build
+   - source install/setup.bash
+   - cd ..
 
 
 # Prior to launch the ROS2 AI Agent demos
@@ -105,11 +121,18 @@ In the second terminal, send user prompts to the ROS2 AI Agent as strings to the
    - ros2 topic pub -1 /llm_prompt std_msgs/msg/String "{data: 'Get the current gripper pose'}"
    - ros2 topic pub -1 /llm_prompt std_msgs/msg/String "{data: 'Get the current position of end effector and reduce z value by 0.2'}"
 
-# Validation Metrics
+# Evaluation Metrics
 
-... TBD ... 
+Tool Awareness 
 
 # References:
+
+Controlling Robots with LLMs series
+   - [Part 1 - The Genius Taxi Driver] https://avnet.me/llm-robot-control-01
+   - [Part 2 - OLLAMA - Getting Started Guide for AMD GPUs] https://avnet.me/llm-robot-control-02
+   - [Part 3 - LANGCHAIN - Getting Started Guide for AMD GPUs] https://avnet.me/llm-robot-control-03
+   - [Part 4 - Implementing Agentic AI in ROS2 for Robotics Control] https://avnet.me/llm-robot-control-04
+   - [Part 5 - Evaluating Tool Awareness of LLMs for Robotics Control] https://avnet.me/llm-robot-control-05
 
 Mastering ROS2 for Robotics Applications:
 

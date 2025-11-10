@@ -151,9 +151,10 @@ class ROS2AIAgent(Node):
             basic_tools_prompt2 = """
             Human: What ROS distribution am I using?
             AI: Current ROS distribution: humble
+            
             Human: What is my ROS domain ID?
             AI: Current ROS domain ID: 0
-            Human: Show me all running nodes
+            
             """
         else:
             basic_tools_prompt1 = ""

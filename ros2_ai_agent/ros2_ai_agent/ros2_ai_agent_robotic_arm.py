@@ -639,7 +639,12 @@ class ROS2AIAgent(Node):
         try:
             # In langchain 1.0, agent.invoke() expects a dict with 'messages' key
             # and returns a dict with 'messages' key containing the conversation
-            result = self.agent.invoke({"messages": [HumanMessage(content=msg.data)]})
+            # Set max_concurrency=1 to ensure tools execute sequentially (not in parallel)
+            # This allows the tool_delay to work properly for robot movements
+            result = self.agent.invoke(
+                {"messages": [HumanMessage(content=msg.data)]},
+                config={"max_concurrency": 1}
+            )
             self.get_logger().info(f"Result: {result}")
             
             # Extract the final output from the last message in the conversation

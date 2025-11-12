@@ -22,12 +22,11 @@ from moveit_msgs.msg import MotionPlanRequest, Constraints, PositionConstraint, 
 from moveit_msgs.msg import BoundingVolume
 from shape_msgs.msg import SolidPrimitive
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion, Vector3
-from langchain.agents import AgentExecutor
-from langchain.agents import create_openai_tools_agent, create_tool_calling_agent
+from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 from langchain_ollama import ChatOllama
 from langchain.tools import tool
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import HumanMessage
 from dotenv import load_dotenv
 from tf2_ros import TransformListener, Buffer
 from rclpy.duration import Duration
@@ -512,14 +511,6 @@ class ROS2AIAgent(Node):
     # --------------------------
     def llm_agent_creator(self):
     
-    
-        self.prompt = ChatPromptTemplate.from_messages([
-            ("system", self.system_prompt),
-            MessagesPlaceholder("chat_history", optional=True),
-            ("human", "{input}"),
-            MessagesPlaceholder("agent_scratchpad"),
-        ])
-
         # Load OpenAI configuration
         share_dir = get_package_share_directory('ros2_ai_agent')
         config_dir = share_dir + '/config' + '/openai.env'
@@ -533,14 +524,13 @@ class ROS2AIAgent(Node):
         else:
             self.get_logger().error(f'Invalid llm_api: {self.llm_api}')
 
-        # Construct the AI Tools agent
-        if self.llm_api == "openai":
-            self.agent = create_openai_tools_agent(self.llm, self.toolkit, self.prompt)
-        elif self.llm_api == "ollama":
-            self.agent = create_tool_calling_agent(self.llm, self.toolkit, self.prompt)
-
-        # Create an agent executor by passing in the agent and tools
-        self.agent_executor = AgentExecutor(agent=self.agent, tools=self.toolkit, verbose=True)
+        # Create the agent using langchain 1.0 API
+        # The create_agent function replaces create_openai_tools_agent and create_tool_calling_agent
+        self.agent = create_agent(
+            model=self.llm,
+            tools=self.toolkit,
+            system_prompt=self.system_prompt
+        )
 
     # --------------------------
     # Parameter change validator
@@ -647,13 +637,24 @@ class ROS2AIAgent(Node):
     # --------------------------
     def llm_prompt_callback(self, msg):
         try:
-            result = self.agent_executor.invoke({"input": msg.data})
+            # In langchain 1.0, agent.invoke() expects a dict with 'messages' key
+            # and returns a dict with 'messages' key containing the conversation
+            result = self.agent.invoke({"messages": [HumanMessage(content=msg.data)]})
             self.get_logger().info(f"Result: {result}")
-            self.get_logger().info(f"Output: {result['output']}")
-
-            msg = String()
-            msg.data = f"Output: ({result['output']})"
-            self.llm_output_pub.publish(msg)
+            
+            # Extract the final output from the last message in the conversation
+            if 'messages' in result and len(result['messages']) > 0:
+                output = result['messages'][-1].content
+                self.get_logger().info(f"Output: {output}")
+                
+                msg = String()
+                msg.data = f"Output: ({output})"
+                self.llm_output_pub.publish(msg)
+            else:
+                self.get_logger().warn("No messages in result")
+                msg = String()
+                msg.data = "Output: (No response)"
+                self.llm_output_pub.publish(msg)
 
         except Exception as e:
             self.get_logger().error(f'Error processing prompt: {str(e)}')

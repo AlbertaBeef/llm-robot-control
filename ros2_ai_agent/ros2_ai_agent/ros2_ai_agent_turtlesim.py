@@ -34,11 +34,11 @@ Dependencies:
     - math
     - geometry_msgs.msg (Twist)
     - turtlesim.msg (Pose)
-    - langchain.agents (AgentExecutor, create_openai_tools_agent)
+    - langchain.agents (create_agent)
     - langchain_openai (ChatOpenAI)
     - langchain_ollama (ChatOllama)
-    - langchain.tools (BaseTool, StructuredTool, tool)
-    - langchain_core.prompts (ChatPromptTemplate, MessagesPlaceholder)
+    - langchain.tools (tool)
+    - langchain_core.messages (HumanMessage)
     - dotenv (load_dotenv)
     - std_msgs.msg (String)
     - rclpy (rclpy, Node)
@@ -61,7 +61,7 @@ from transforms3d.euler import quat2euler  # Replace tf_transformations import
 from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 from langchain_ollama import ChatOllama
-from langchain.tools import BaseTool, StructuredTool, tool
+from langchain.tools import tool
 from langchain_core.messages import HumanMessage
 from dotenv import load_dotenv
 

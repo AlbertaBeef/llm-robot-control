@@ -118,6 +118,9 @@ class ROS2AIAgent(Node):
         self.tool_delay = self.get_parameter("tool_delay").value
         self.get_logger().info('tool_delay : "%f"' % self.tool_delay)        
         
+        # Flag to prevent processing multiple prompts simultaneously
+        self.processing_prompt = False
+        
         # Initialize turtle pose
         self.turtle_pose = Pose()
         
@@ -564,6 +567,12 @@ class ROS2AIAgent(Node):
     # LLM prompt Callback
     # --------------------------
     def llm_prompt_callback(self, msg):
+        # Check if already processing a prompt
+        if self.processing_prompt:
+            self.get_logger().warn(f"Already processing a prompt, ignoring: {msg.data}")
+            return
+        
+        self.processing_prompt = True
         try:
             # In langchain 1.0, agent.invoke() expects a dict with 'messages' key
             # and returns a dict with 'messages' key containing the conversation
@@ -595,6 +604,8 @@ class ROS2AIAgent(Node):
             msg = String()
             msg.data = f"Error: ({str(e)})"
             self.llm_output_pub.publish(msg)
+        finally:
+            self.processing_prompt = False
             
 def main(args=None):
     rclpy.init(args=args)
